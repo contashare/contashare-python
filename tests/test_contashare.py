@@ -110,6 +110,21 @@ class ContaShareTest(unittest.TestCase):
 
         self.assertEqual(transport.calls[0]["url"], "https://contashare.com/api/v1/address/address-1")
 
+    def test_a_customer_token_is_never_sent_to_another_site_as_a_forged_webhook_could_name_one(self):
+        transport = FakeTransport()
+        contashare = client(transport)
+
+        for url in (
+            "https://evil.example/api/v1/address/1",
+            "//evil.example/api/v1/address/1",
+            "https://contashare.com.evil.example/x",
+            "http://contashare.com/api/v1/address/1",
+            "https://contashare.com@evil.example/x",
+        ):
+            with self.assertRaises(ValueError):
+                contashare.get(url, "access-1")
+        self.assertEqual(transport.calls, [])
+
     def test_a_base_url_points_it_at_another_contashare(self):
         url = client(base_url="http://localhost:8000/").authorize_url("s")
 

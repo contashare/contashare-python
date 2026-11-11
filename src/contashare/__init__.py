@@ -28,10 +28,20 @@ class ContaShareError(Exception):
         self.body = body
 
 
+class _NoRedirects(urllib.request.HTTPRedirectHandler):
+    """Redirects are never followed, so a customer's token can't be carried to another site."""
+
+    def redirect_request(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+
+_opener = urllib.request.build_opener(_NoRedirects)
+
+
 def _urllib_transport(method: str, url: str, headers: Dict[str, str], body: Optional[bytes]) -> Tuple[int, bytes]:
     request = urllib.request.Request(url, data=body, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(request, timeout=10) as response:
+        with _opener.open(request, timeout=10) as response:
             return response.status, response.read()
     except urllib.error.HTTPError as error:
         return error.code, error.read()
@@ -105,8 +115,20 @@ class ContaShare:
         """Any API endpoint, such as a webhook's ``resource_url`` or ``/api/v1/email``."""
         return self._body_or_raise(*self._request(path_or_url, access_token))
 
+    def _api_url(self, path_or_url: str) -> str:
+        """A customer's token is only ever sent to ContaShare.
+
+        A full URL, such as a webhook's resource_url, must be on the same site as base_url: a forged webhook could
+        otherwise name an attacker's server and be handed the token.
+        """
+        base = urllib.parse.urlsplit(self.base_url + "/")
+        url = urllib.parse.urlsplit(urllib.parse.urljoin(self.base_url + "/", path_or_url))
+        if (url.scheme, url.netloc) != (base.scheme, base.netloc):
+            raise ValueError(f"Refusing to send a customer's token to {url.scheme}://{url.netloc}: it is not {self.base_url}.")
+        return url.geturl()
+
     def _request(self, path_or_url: str, access_token: str) -> Tuple[int, Any]:
-        url = path_or_url if path_or_url.startswith("http") else f"{self.base_url}{path_or_url}"
+        url = self._api_url(path_or_url)
         # Without Accept: application/json, ContaShare redirects an unauthorised call to its login page instead of a 401.
         headers = {"Accept": "application/json", "Authorization": f"Bearer {access_token}"}
         status, raw = self._transport("GET", url, headers, None)
