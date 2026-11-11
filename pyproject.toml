@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "contashare"
+version = "0.1.0"
+description = "Sign in with ContaShare and read the details your customers share, plus a checker for ContaShare webhook signatures."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+keywords = ["contashare", "oauth", "sign in", "webhooks"]
+dependencies = []
+
+[project.urls]
+Homepage = "https://contashare.com/help/oauth"
+
+[tool.setuptools.packages.find]
+where = ["src"]
